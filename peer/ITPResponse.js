@@ -27,9 +27,9 @@ module.exports = {
     // V
     storeBitPacket(this.responseHeader, version, 0, 4);
     // Response type
-    storeBitPacket(this.responseHeader, resType, 4, 2);
+    storeBitPacket(this.responseHeader, resType, 4, 7);
     // sequenceNumber
-    storeBitPacket(this.responseHeader, sequenceNum, 6, 26);
+    storeBitPacket(this.responseHeader, sequenceNum, 11, 21);
     // timeStamp
     storeBitPacket(this.responseHeader, currentTime, 32, 32);
     // Image size in byte

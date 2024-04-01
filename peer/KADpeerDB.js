@@ -33,7 +33,6 @@ fs.readdir('./', (err, files) => {
         if(ext === '.gif' || ext === '.jpeg' || ext === '.png' || ext === '.bmp'){
             //Add an image to the images in singleton
             Singleton.setImage(Helpers.getKeyID(file), file);
-            console.log(Singleton.getImage());
         }
     });
 });
@@ -62,13 +61,15 @@ if (arguments.length <= 4){
     }
     /*-------------------- END ------------------------*/
     
-    const peer = net.createServer() // create server
-    peer.listen(PORT, HOST)
+    const peer = net.createServer(); // create server
+    peer.listen(PORT, HOST);
 
     /*-------------------- Create a second server to host image requests ------------------------*/
     const image = net.createServer();
     const PORT_db = Helpers.getRandomPort(); // get a random port to start up server
-    image.listen(HOST, PORT_db);
+    image.listen(PORT_db, HOST);
+
+    console.log(`ImageDB server has started at timestamp: ${Singleton.getTimestamp()} and is listening on ${HOST}:${PORT_db}`);
     /*-------------------- END ------------------------*/
 
     let peerID = Helpers.getPeerID(HOST, PORT) // get the peerID of this port
