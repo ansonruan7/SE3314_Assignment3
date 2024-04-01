@@ -12,16 +12,16 @@ net.bufferSize = 300000;
 let HOST = '127.0.0.1',
     PORT;
 let arguments = process.argv // get current arguments
-let peerName = require('path').basename(__dirname) // get the folder name
 
 Singleton.init(); // initialize singleton
-Singleton.setPeerName(peerName) // set the peer name in the singleton
+let peerName = arguments[3]
+    Singleton.setPeerName(peerName)
 
 /*-------------------- Scan for images and set up key and name ------------------------*/
 const fs = require('fs');
 const path = require('path');
 //Check current directory
-fs.readdir('./', (err, files) => {
+fs.readdir(`../${peerName}`, (err, files) => {
     if (err) {
         console.log('Error reading directory:', err);
         return;
@@ -71,7 +71,11 @@ if (arguments.length <= 4){
 
     //Image function
     image.on('connection', function(sock) {
-        P2PHandler.handleImageJoining(sock); //called for each client joining
+        let isFound = P2PHandler.handleImageJoining(sock); //called for each client joining
+        //If it isn't found in this peer, search time!
+        if(isFound.length > 0){
+            P2PHandler.searchPacket(isFound);
+        }
     });
 
     console.log(`ImageDB server has started at timestamp: ${Singleton.getTimestamp()} and is listening on ${HOST}:${PORT_db}`);

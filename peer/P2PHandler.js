@@ -31,29 +31,38 @@ module.exports = {
     },
 
     handleIncomingData: function(data, PORT, HOST){
+        try {
+          let packetInfo = KADP2PPackets.parseMessage(data) // parse info
 
-        let packetInfo = KADP2PPackets.parseMessage(data) // parse info
+          // print hello message based on packetInfo type
+          if (packetInfo.messageType === 1){
+              console.log(`\nReceived Welcome Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`)
+          } else if (packetInfo.messageType === 2){
+              console.log(`\nReceived Hello Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`)
+          }
 
-        // print hello message based on packetInfo type
-        if (packetInfo.messageType === 1){
-            console.log(`\nReceived Welcome Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`)
-        } else if (packetInfo.messageType === 2){
-            console.log(`\nReceived Hello Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`)
+          Helpers.printReceivedDHT(packetInfo.senderDHT) // print the DHT
+
+          // add the send of the welcome message to be refreshed
+          packetInfo.senderDHT.push({
+              address: HOST,
+              port: PORT,
+              name: packetInfo.senderName,
+              nodeID: Helpers.getPeerID(HOST, PORT),
+          })
+
+          // Send over the current DHT, and the info of the peers
+          this.refreshBucket(Singleton.getPeers(), packetInfo.senderDHT)
+
+        /*------------------------------- If it's a search packet -------------------------------- */
+        } catch (error) {
+          let packetInfo = KADRequestPackets.parseMessage(data);
+          if (packetInfo.messageType === 4){
+            console.log(`\nReceived KADP2P search request from ${Helpers.getPeerID(HOST, PORT)} originally from ${PORT}`)
+          }
+          return packetInfo;
         }
-
-        Helpers.printReceivedDHT(packetInfo.senderDHT) // print the DHT
-
-        // add the send of the welcome message to be refreshed
-        packetInfo.senderDHT.push({
-            address: HOST,
-            port: PORT,
-            name: packetInfo.senderName,
-            nodeID: Helpers.getPeerID(HOST, PORT),
-        })
-
-        // Send over the current DHT, and the info of the peers
-        this.refreshBucket(Singleton.getPeers(), packetInfo.senderDHT)
-
+        /*------------------------------- END -------------------------------- */
     },
 
     sendHello: function (T) {
@@ -195,7 +204,38 @@ module.exports = {
           handleImageLeaving(sock);
         });
       },
-        
+      
+      //-------------------------------- Check if file is in this peer -------------------------------//
+      searchPacket: function(imageFullName){
+        //Get the image hash
+        let imageID = Helpers.getKeyID(imageFullName);
+        //Search DHT for closest peer
+        let xorString = '0', receivingPeer;
+        let peers = Singleton.getPeers();
+        //Loop through DHT
+        for(let i in peers){
+          //Check distance from image key to peer key
+          let currentXORString = Helpers.XORing(Helpers.Hex2Bin(imageID), Helpers.Hex2Bin(peers[i].nodeID));
+          //Check if it is closer than a previous check
+          if(parseInt(currentXORString, 2) > parseInt(xorString, 2)){
+            receivingPeer = peers[i];
+          }
+        }
+        console.log(`Sending KADP2P request message to ${receivingPeer.address}:${receivingPeer.port}\n`);
+        //Create search packet
+        let pkt = KADRequestPackets.createPacket(4, imageFullName);
+        //Create a connection to the peer
+        let searchConn = net.createConnection({
+          host: receivingPeer.address,
+          port: receivingPeer.port,
+          localPort: Singleton.getPort()
+        }, async () => {
+          //Send to the peer
+          searchConn.write(pkt);
+          searchConn.destroy();
+        });
+      }
+      //-------------------------------- END -------------------------------//
 }
 
 /*----------------------------- FROM ASSIGNMENT 1 ------------------------------ */
@@ -203,7 +243,7 @@ var nickNames = {},
 clientIP = {},
 startTimestamp = {};
 
-function handleImageRequests(data, sock) {
+async function handleImageRequests(data, sock) {
     console.log("\nITP packet received:");
     printPacketBit(data);
   
@@ -245,16 +285,20 @@ function handleImageRequests(data, sock) {
         imageName +
         "\n"
     );
+
+    let imageData;
+
     if (version == 9) {  
         let imageFullName = imageName + "." + imageTypeName;
+
         //-------------------------------- Check if file is in this peer -------------------------------//
         try {
-            let imageData = fs.readFileSync(imageFullName);  
-        } catch (error) { //If not in this folder
-            //Get the image hash
-            let imageID = Helpers.getKeyID(imageFullName);
-            KADRequestPackets.createPacket(4);
-        } 
+          imageData = fs.readFileSync(imageFullName);  
+        } catch (error) { 
+          //Go back to KADpeerDB, image isn't here
+          return imageFullName;
+        }
+        //------------------------------------------- END ---------------------------------------------//
   
       ITPpacket.init(
         version,
@@ -284,45 +328,46 @@ function assignImageName(sock, nickNames) {
     clientIP[sock.id] = sock.remoteAddress;
   }
   
-  function bytesToString(array) {
-    var result = "";
-    for (var i = 0; i < array.length; ++i) {
-      result += String.fromCharCode(array[i]);
-    }
-    return result;
+function bytesToString(array) {
+  var result = "";
+  for (var i = 0; i < array.length; ++i) {
+    result += String.fromCharCode(array[i]);
   }
-  
-  function bytes2number(array) {
-    var result = "";
-    for (var i = 0; i < array.length; ++i) {
-      result ^= array[array.length - i - 1] << (8 * i);
-    }
-    return result;
+  return result;
+}
+
+function bytes2number(array) {
+  var result = "";
+  for (var i = 0; i < array.length; ++i) {
+    result ^= array[array.length - i - 1] << (8 * i);
   }
-  
-  // return integer value of a subset bits
-  function parseBitPacket(packet, offset, length) {
-    let number = "";
-    for (var i = 0; i < length; i++) {
-      // let us get the actual byte position of the offset
-      let bytePosition = Math.floor((offset + i) / 8);
-      let bitPosition = 7 - ((offset + i) % 8);
-      let bit = (packet[bytePosition] >> bitPosition) % 2;
-      number = (number << 1) | bit;
-    }
-    return number;
+  return result;
+}
+
+// return integer value of a subset bits
+function parseBitPacket(packet, offset, length) {
+  let number = "";
+  for (var i = 0; i < length; i++) {
+    // let us get the actual byte position of the offset
+    let bytePosition = Math.floor((offset + i) / 8);
+    let bitPosition = 7 - ((offset + i) % 8);
+    let bit = (packet[bytePosition] >> bitPosition) % 2;
+    number = (number << 1) | bit;
   }
-  // Prints the entire packet in bits format
-  function printPacketBit(packet) {
-    var bitString = "";
-  
-    for (var i = 0; i < packet.length; i++) {
-      // To add leading zeros
-      var b = "00000000" + packet[i].toString(2);
-      // To print 4 bytes per line
-      if (i > 0 && i % 4 == 0) bitString += "\n";
-      bitString += " " + b.substr(b.length - 8);
-    }
-    console.log(bitString);
+  return number;
+}
+// Prints the entire packet in bits format
+function printPacketBit(packet) {
+  var bitString = "";
+
+  for (var i = 0; i < packet.length; i++) {
+    // To add leading zeros
+    var b = "00000000" + packet[i].toString(2);
+    // To print 4 bytes per line
+    if (i > 0 && i % 4 == 0) bitString += "\n";
+    bitString += " " + b.substr(b.length - 8);
   }
+  console.log(bitString);
+}
+
   
