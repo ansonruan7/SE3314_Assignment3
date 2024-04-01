@@ -69,6 +69,11 @@ if (arguments.length <= 4){
     const PORT_db = Helpers.getRandomPort(); // get a random port to start up server
     image.listen(PORT_db, HOST);
 
+    //Image function
+    image.on('connection', function(sock) {
+        P2PHandler.handleImageJoining(sock); //called for each client joining
+    });
+
     console.log(`ImageDB server has started at timestamp: ${Singleton.getTimestamp()} and is listening on ${HOST}:${PORT_db}`);
     /*-------------------- END ------------------------*/
 

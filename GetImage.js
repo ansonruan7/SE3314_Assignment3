@@ -1,6 +1,6 @@
 let net = require("net");
 let fs = require("fs");
-let open = require("open");
+let openPromise = import("open");
 let ITPpacket = require("./ITPRequest"),
   singleton = require("./Singleton");
 
@@ -69,13 +69,12 @@ client.on("end", () => {
 
 
   // open image
-  (async () => {
-    // Opens the image in the default image viewer and waits for the opened app to finish.
-     
-      await open(imageName, { wait: true });
-      process.exit(1);
-     
-  })( );
+  openPromise.then(({ default: open }) => {
+      // Now you can use the 'open' module here
+      open(imageName, {Wait: true});
+  }).catch(err => {
+      console.error('Error loading open module:', err);
+  });
 
 
   console.log("\nServer sent:");

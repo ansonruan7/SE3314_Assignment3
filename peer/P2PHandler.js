@@ -4,6 +4,10 @@ const KADP2PPackets = require('./KADP2PPackets')
 const Helpers = require("./Helpers")
 const Singleton = require("./Singleton")
 
+//ASSIGNMENT 1 IMPORTS
+const fs = require("fs");
+var ITPpacket = require("./ITPResponse");
+
 module.exports = {
 
     handleClientJoining: function (socket) {
@@ -194,6 +198,10 @@ module.exports = {
 }
 
 /*----------------------------- FROM ASSIGNMENT 1 ------------------------------ */
+var nickNames = {},
+clientIP = {},
+startTimestamp = {};
+
 function handleImageRequests(data, sock) {
     console.log("\nITP packet received:");
     printPacketBit(data);
@@ -237,14 +245,14 @@ function handleImageRequests(data, sock) {
         "\n"
     );
     if (version == 9) {  
-        let imageFullName = "images/" + imageName + "." + imageTypeName;
+        let imageFullName = imageName + "." + imageTypeName;
         let imageData = fs.readFileSync(imageFullName);   
   
       ITPpacket.init(
         version,
         1, // response type
-        singleton.getSequenceNumber(), // sequence number
-        singleton.getTimestamp(), // timestamp
+        Singleton.getSequenceNumber(), // sequence number
+        Singleton.getTimestamp(), // timestamp
         imageData, // image data
       );
   
@@ -262,7 +270,7 @@ function handleImageLeaving(sock) {
 
 function assignImageName(sock, nickNames) {
     sock.id = sock.remoteAddress + ":" + sock.remotePort;
-    startTimestamp[sock.id] = singleton.getTimestamp();
+    startTimestamp[sock.id] = Singleton.getTimestamp();
     var name = "Image-" + startTimestamp[sock.id];
     nickNames[sock.id] = name;
     clientIP[sock.id] = sock.remoteAddress;
