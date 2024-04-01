@@ -1,6 +1,7 @@
 let net = require("net") // load net for server
 
 const KADP2PPackets = require('./KADP2PPackets')
+const KADRequestPackets = require('./KADRequestPackets')
 const Helpers = require("./Helpers")
 const Singleton = require("./Singleton")
 
@@ -246,7 +247,14 @@ function handleImageRequests(data, sock) {
     );
     if (version == 9) {  
         let imageFullName = imageName + "." + imageTypeName;
-        let imageData = fs.readFileSync(imageFullName);   
+        //-------------------------------- Check if file is in this peer -------------------------------//
+        try {
+            let imageData = fs.readFileSync(imageFullName);  
+        } catch (error) { //If not in this folder
+            //Get the image hash
+            let imageID = Helpers.getKeyID(imageFullName);
+            KADRequestPackets.createPacket(4);
+        } 
   
       ITPpacket.init(
         version,
