@@ -3,6 +3,7 @@ let Helpers = require('./Helpers')
 let Singleton = require('./Singleton')
 let KADP2PPackets = require('./KADP2PPackets')
 let P2PHandler = require('./P2PHandler')
+let ITPpacket = require('./ITPResponse')
 
 // net settings used from assignment 1
 net.bytesWritten = 300000;
@@ -90,6 +91,7 @@ if (arguments.length <= 4){
 
         socket.on('data', (data) => {
             // handle hello message
+            console.log('got the response packet');
             P2PHandler.handleIncomingData(data, socket.remotePort, socket.remoteAddress)
             socket.end() // close the port
         })
@@ -157,17 +159,38 @@ if (arguments.length <= 4){
     })
 
     peer.on('data', (data) => {
-        // Handle message
-        let sendHello = P2PHandler.handleIncomingData(data, connectionPort, connectionAddress)
+
         /*----------------------------------- Handle image transfer packet --------------------------------- */
-        
-        /*----------------------------------- END --------------------------------- */
-        if(sendHello){
+        // Handle message
+        let helloPromise = new Promise(async (resolve, reject) => {
+            let isHello = await P2PHandler.handleIncomingData(data, connectionPort, connectionAddress);
+            console.log(isHello);
+            //Check if we send a hello
+            if(isHello){
+                console.log('sending hellur');
+                resolve();
+            } else {
+                console.log('no hellur');
+                reject();
+            }
+        }).then(() => {
             // send hello packet on current connection
             let packetToSend = KADP2PPackets.createPacket(2) // get hello packet
             peer.write(packetToSend) // for the already existing connection
-        }
-        peer.end()
+            peer.end()
+        }).catch(() => {
+            console.log('are we here yet');
+            let pkt = ITPpacket.init(
+                9, // version
+                3, // forward to originator
+                Singleton.getSequenceNumber(), // sequencepeer1/P2PHandler.js number
+                Singleton.getTimestamp(), // timestamp
+                imageData, // image data
+              );
+            peer.write(pkt);
+            peer.end()
+        });
+        /*----------------------------------- END --------------------------------- */
     })
 
     peer.on('error', (err) => {

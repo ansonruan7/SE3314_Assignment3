@@ -33,12 +33,16 @@ module.exports = {
     handleIncomingData: async function(data, PORT, HOST){
         try {
           let packetInfo = KADP2PPackets.parseMessage(data) // parse info
+          let hello = false;
 
           // print hello message based on packetInfo type
           if (packetInfo.messageType === 1){
-              console.log(`\nReceived Welcome Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`)
+              console.log(`\nReceived Welcome Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`);
+              hello = true;
+
           } else if (packetInfo.messageType === 2){
-            console.log(`\nReceived Hello Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`)
+            console.log(`\nReceived Hello Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`);
+            hello = true;
           } 
           /*---------------------------------------- Handle search packets ----------------------------------------- */
             else if (packetInfo.messageType === 4){
@@ -46,9 +50,12 @@ module.exports = {
             console.log(`\nReceived KADP2P search request from ${Helpers.getPeerID(HOST, PORT)} originally from ${PORT}`);
             //Check if this image is in this folder
             let imageKey = Helpers.getKeyID(packetInfo.imageName + '.' + packetInfo.imageExtension);
+            //Boolean check
+            let isFound = false;
             for(let i in Singleton.getImage()){
               if(i == imageKey){
-                let imageData = fs.readFileSync(packetInfo.imageName + '.' + packetInfo.imageExtension.toLowerCase());
+                isFound = true;
+                break;
                 // let pkt = ITPpacket.init(
                 //   9, // version
                 //   3, // forward to originator
@@ -67,13 +74,16 @@ module.exports = {
                 //   forwardConn.end();
                 // });
                 //End function
-                console.log('we definitely got here');
-                return false;
               }
             }
-            //If loops ends, that means the image isn't in this peer
-            searchPacket(packetInfo.imageName + '.' + packetInfo.imageExtension, );
-            return false;
+            if(isFound){
+              let imageData = fs.readFileSync(packetInfo.imageName + '.' + packetInfo.imageExtension.toLowerCase());
+              console.log("we here?")
+              return [false, imageData];
+            } else if(!hello){
+              searchPacket(packetInfo.imageName + '.' + packetInfo.imageExtension);
+              return [false, null];
+            }
           } 
           /*---------------------- This is the originator, forward to client ----------------- */
           else if (packetInfo.messageType === 3){
@@ -100,7 +110,7 @@ module.exports = {
           // Send over the current DHT, and the info of the peers
           this.refreshBucket(Singleton.getPeers(), packetInfo.senderDHT)
 
-          return true;
+          return [true, null];
 
         } catch (error) {
           console.log("Error", error);

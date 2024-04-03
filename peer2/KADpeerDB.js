@@ -163,11 +163,12 @@ if (arguments.length <= 4){
         // Handle message
         let helloPromise = new Promise(async (resolve, reject) => {
             let isHello = await P2PHandler.handleIncomingData(data, connectionPort, connectionAddress);
+            console.log(isHello);
             //Check if we send a hello
-            if(isHello){
+            if(isHello[0]){
                 console.log('sending hellur');
                 resolve();
-            } else {
+            } else if(!isHello[0]) {
                 console.log('no hellur');
                 reject();
             }
@@ -183,7 +184,7 @@ if (arguments.length <= 4){
                 3, // forward to originator
                 Singleton.getSequenceNumber(), // sequencepeer1/P2PHandler.js number
                 Singleton.getTimestamp(), // timestamp
-                imageData, // image data
+                isHello[1], // image data
               );
             peer.write(pkt);
             peer.end()
