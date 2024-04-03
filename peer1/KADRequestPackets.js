@@ -18,9 +18,33 @@ module.exports = {
 
         /*----------------------- Image Data ------------------------ */
             imageData = new Buffer.alloc(4),
-            imageNameData = new Buffer.alloc(IMG_NAME_EXT[0].length);
+            imageNameData = new Buffer.alloc(IMG_NAME_EXT[0].length),
+            imageNameLength = IMG_NAME_EXT[0].length,
+            imageExt;
         
-        Helpers.storeBitPacket(imageData, IMG_NAME_EXT[1].toUpperCase(), 0, 4)
+        //Transform image extension into the proper type
+        switch(IMG_NAME_EXT[1].toUpperCase()){
+            case("BMP"):
+                imageExt = 1;
+                break;
+            case("JPEG"):
+                imageExt = 2;
+                break;
+            case("GIF"):
+                imageExt = 3;
+                break;
+            case("PNG"):
+                imageExt = 4;
+                break;
+            case("TIFF"):
+                imageExt = 5;
+                break;
+            case("RAW"):
+                imageExt = 15;
+                break;
+        }
+        Helpers.storeBitPacket(imageData, imageExt, 0, 4);
+        Helpers.storeBitPacket(imageData, imageNameLength, 4, 28);
 
         let imageNameInBytes = Helpers.stringToBytes(IMG_NAME_EXT[0]);
         // add the peer name bytes to the buffer
@@ -67,9 +91,31 @@ module.exports = {
         let senderNameLength = Helpers.parseBitPacket(data, 20, 12) // get the sender name length
 
         /*----------------------- Image Data ------------------------ */
-        let imageDataStart = numberOfPeers*(48+16);
-        let imageExtension = Helpers.parseBitPacket(data, 32+imageDataStart, 4);
-        let imageNameLength = Helpers.parseBitPacket(data, 32+imageDataStart+4, 28);
+        let imageDataStart = numberOfPeers*(64) + 32;
+        let imageExtensionData = Helpers.parseBitPacket(data, imageDataStart, 4);
+        //Transform image extension into the proper type
+        let imageExt;
+        switch(imageExtensionData){
+            case(1):
+                imageExt = "BMP";
+                break;
+            case(2):
+                imageExt = "JPEG";
+                break;
+            case(3):
+                imageExt = "GIF";
+                break;
+            case(4):
+                imageExt = "PNG";
+                break;
+            case(5):
+                imageExt = "TIFF";
+                break;
+            case(15):
+                imageExt = "RAW";
+                break;
+        }
+        let imageNameLength = Helpers.parseBitPacket(data, imageDataStart+4, 28);
         /*--------------------------- END --------------------------- */
        
         // if version number is not 9, ignore the message
@@ -98,7 +144,6 @@ module.exports = {
         /*----------------------- Image Data ------------------------ */
 
         let imageNameArr = [];
-
         for(let i=0; i<imageNameLength; i++){
             // add bytes of sendName starting @ bit 32 + after peer data 
             imageNameArr.push(Helpers.parseBitPacket(data, 32+imageDataStart+(8*i), 8));
@@ -124,7 +169,7 @@ module.exports = {
             version: version,
             messageType: messageType, 
             numberOfPeers: numberOfPeers,
-            imageExtension: imageExtension,
+            imageExtension: imageExt,
             imageNameLength: imageNameLength,
             imageName: imageName,
             senderDHT: senderDHT
