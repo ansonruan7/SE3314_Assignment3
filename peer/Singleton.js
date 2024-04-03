@@ -6,7 +6,8 @@ let sequenceNumber,
     peerName,
     host,
     port,
-    images = {};
+    clientSocket,
+    images = {},
     peers = {};
 
 /*
@@ -85,5 +86,13 @@ module.exports = {
 
     getImage: function(){
         return images;
+    },
+
+    setClient: function(sock){
+        clientSocket = sock;
+    },
+
+    getClient: function(){
+        return clientSocket;
     },
 }

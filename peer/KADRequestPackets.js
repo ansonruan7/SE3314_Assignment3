@@ -99,7 +99,7 @@ module.exports = {
 
         let imageNameArr = [];
 
-        for(let i=0; i<senderNameLength; i++){
+        for(let i=0; i<imageNameLength; i++){
             // add bytes of sendName starting @ bit 32 + after peer data 
             imageNameArr.push(Helpers.parseBitPacket(data, 32+imageDataStart+(8*i), 8));
         }

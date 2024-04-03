@@ -71,11 +71,7 @@ if (arguments.length <= 4){
 
     //Image function
     image.on('connection', function(sock) {
-        let isFound = P2PHandler.handleImageJoining(sock); //called for each client joining
-        //If it isn't found in this peer, search time!
-        if(isFound.length > 0){
-            P2PHandler.searchPacket(isFound);
-        }
+        P2PHandler.handleImageJoining(sock); //called for each client joining
     });
 
     console.log(`ImageDB server has started at timestamp: ${Singleton.getTimestamp()} and is listening on ${HOST}:${PORT_db}`);
@@ -161,13 +157,16 @@ if (arguments.length <= 4){
     })
 
     peer.on('data', (data) => {
-        // Handle welcome message
-        P2PHandler.handleIncomingData(data, connectionPort, connectionAddress)
-
-        // send hello packet on current connection
-        let packetToSend = KADP2PPackets.createPacket(2) // get hello packet
-        peer.write(packetToSend) // for the already existing connection
-
+        // Handle message
+        let sendHello = P2PHandler.handleIncomingData(data, connectionPort, connectionAddress)
+        /*----------------------------------- Handle image transfer packet --------------------------------- */
+        
+        /*----------------------------------- END --------------------------------- */
+        if(sendHello){
+            // send hello packet on current connection
+            let packetToSend = KADP2PPackets.createPacket(2) // get hello packet
+            peer.write(packetToSend) // for the already existing connection
+        }
         peer.end()
     })
 
