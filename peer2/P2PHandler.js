@@ -30,7 +30,7 @@ module.exports = {
         Helpers.printDHT(Object.values(Singleton.getPeers())) // print out the DHT
     },
 
-    handleIncomingData: function(data, PORT, HOST){
+    handleIncomingData: async function(data, PORT, HOST){
         try {
           let packetInfo = KADP2PPackets.parseMessage(data) // parse info
 
@@ -49,13 +49,13 @@ module.exports = {
             for(let i in Singleton.getImage()){
               if(i == imageKey){
                 let imageData = fs.readFileSync(packetInfo.imageName + '.' + packetInfo.imageExtension.toLowerCase());
-                let pkt = ITPpacket.init(
-                  9, // version
-                  3, // forward to originator
-                  Singleton.getSequenceNumber(), // sequencepeer1/P2PHandler.js number
-                  Singleton.getTimestamp(), // timestamp
-                  imageData, // image data
-                );
+                // let pkt = ITPpacket.init(
+                //   9, // version
+                //   3, // forward to originator
+                //   Singleton.getSequenceNumber(), // sequencepeer1/P2PHandler.js number
+                //   Singleton.getTimestamp(), // timestamp
+                //   imageData, // image data
+                // );
                 // //Create a connection with originating peer and send packet
                 // console.log('we got here');
                 // let forwardConn = net.createConnection({
@@ -67,7 +67,8 @@ module.exports = {
                 //   forwardConn.end();
                 // });
                 //End function
-                return pkt;
+                console.log('we definitely got here');
+                return false;
               }
             }
             //If loops ends, that means the image isn't in this peer
