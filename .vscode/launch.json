@@ -25,5 +25,25 @@
             "program": "${workspaceFolder}/peer2/KADpeerDB.js",
             "args":["n", "peer2", "-p", "127.0.0.1:2011"]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "peer3",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/peer3/KADpeerDB.js",
+            "args":["n", "peer3", "-p", "127.0.0.1:2011"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "client",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/client/GetImage.js",
+            "args":["s", "127.0.0.1:3602", "-q", "Parrots.jpeg", "v", "9"]
+        },
 ]
 }

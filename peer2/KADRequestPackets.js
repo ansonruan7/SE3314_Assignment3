@@ -2,8 +2,7 @@ const Helpers = require("./Helpers")
 const Singleton = require("./Singleton")
 
 module.exports = {
-    createPacket: function (messageType, imageName){
-
+    createPacket: function (messageType, imageName, HOST, PORT){
         // create packet information
         const VERSION = 9,
               MESSAGE_TYPE = messageType, // message type is one or two, one for welcome - two for hello
@@ -14,7 +13,7 @@ module.exports = {
         let senderInfoData = new Buffer.alloc(4), // 4 bytes for the header information that is not dynamic
             // V = 7 (4 bits), Message Type (1 Byte), Number of Bytes (1 byte), Sender Name Length (1.5 bytes)
             //senderNameData = new Buffer.alloc(PEER_NAME.length), // next is the length of the peername
-            peerData = new Buffer.alloc(8*(DHT.length)), // each peer has 6 bytes of data
+            originData = new Buffer.alloc(8), // 8 bytes for originData
 
         /*----------------------- Image Data ------------------------ */
             imageData = new Buffer.alloc(4),
@@ -58,30 +57,18 @@ module.exports = {
         Helpers.storeBitPacket(senderInfoData, DHT.length, 11, 9) // store the number of peers
         Helpers.storeBitPacket(senderInfoData, PEER_NAME.length, 20, 12) // store the length of the peer name
 
-        // let senderNameInBytes = Helpers.stringToBytes(PEER_NAME) // convert the peerName into bytes
-
-        // // add the peer name bytes to the buffer
-        // for (let i=0; i<PEER_NAME.length; i++){
-        //     Helpers.storeBitPacket(senderNameData, senderNameInBytes[i], (i*8), 8) // Store the peer name
-        // }
-
-        let baseAddress = 0; // base address
-
-        // the values of DHT are a hashmap with the address, port, and nodeID
-        for (const [_, v] of DHT) {
-            let address = v.address,
-                port = v.port;
-            let [p1, p2, p3, p4] = address.split(".") // split the address based on "."
-            Helpers.storeBitPacket(peerData, parseInt(p1), baseAddress+0, 8); // add first part of IP address
-            Helpers.storeBitPacket(peerData, parseInt(p2), baseAddress+8, 8); // add second part of IP address
-            Helpers.storeBitPacket(peerData, parseInt(p3), baseAddress+16, 8); // add third part of IP address
-            Helpers.storeBitPacket(peerData, parseInt(p4), baseAddress+24, 8); // add fourth part of IP address
-            Helpers.storeBitPacket(peerData, parseInt(port), baseAddress+32, 16);
-            baseAddress += 48+16 // Each node uses 48 bits (32 + 16), want to adjust base each time
-        }
+        /*------------------------------- Store originating peer info ----------------------------- */
+        let [p1, p2, p3, p4] = HOST.split(".") // split the address based on "."
+            Helpers.storeBitPacket(originData, parseInt(p1), 0, 8); // add first part of IP address
+            Helpers.storeBitPacket(originData, parseInt(p2), 8, 8); // add second part of IP address
+            Helpers.storeBitPacket(originData, parseInt(p3), 16, 8); // add third part of IP address
+            Helpers.storeBitPacket(originData, parseInt(p4), 24, 8); // add fourth part of IP address
+        Helpers.storeBitPacket(originData, parseInt(PORT), 32, 16);
+        /*--------------------------- END --------------------------- */
+        
 
         // return a buffer which combines the three segments of buffers
-        return Buffer.concat([senderInfoData, peerData, imageData, imageNameData]);},
+        return Buffer.concat([senderInfoData, originData, imageData, imageNameData]);},
 
     parseMessage: function (data) {
         // Get first 4 bytes
@@ -91,7 +78,7 @@ module.exports = {
         let senderNameLength = Helpers.parseBitPacket(data, 20, 12) // get the sender name length
 
         /*----------------------- Image Data ------------------------ */
-        let imageDataStart = numberOfPeers*(64) + 32;
+        let imageDataStart = 32 + 64;
         let imageExtensionData = Helpers.parseBitPacket(data, imageDataStart, 4);
         //Transform image extension into the proper type
         let imageExt;
@@ -123,23 +110,14 @@ module.exports = {
             return;
         }
 
-         // get DHT table information
-         let senderDHT = []
-         let baseAddress = 32  // get the base addrss for the peeres
-         for (let i=0; i<numberOfPeers; i++){
-             let p1 = Helpers.parseBitPacket(data, baseAddress, 8), // get IPV4 val 1
-                 p2 = Helpers.parseBitPacket(data, baseAddress+8, 8), // get IPV4 val 2
-                 p3 = Helpers.parseBitPacket(data, baseAddress+16, 8), // get IPV4 val 3
-                 p4 = Helpers.parseBitPacket(data, baseAddress+24, 8); // get IPV4 val 4
+        /*----------------------- Origin Data ----------------------- */
+        let p1 = Helpers.parseBitPacket(data, 32, 8), // get IPV4 val 1
+                 p2 = Helpers.parseBitPacket(data, 32+8, 8), // get IPV4 val 2
+                 p3 = Helpers.parseBitPacket(data, 32+16, 8), // get IPV4 val 3
+                 p4 = Helpers.parseBitPacket(data, 32+24, 8); // get IPV4 val 4
              let address = `${p1}.${p2}.${p3}.${p4}`
-             let port = Helpers.parseBitPacket(data, baseAddress+32, 16) // get port
-             senderDHT.push({
-                 address: address,
-                 port: port,
-                 nodeID: Helpers.getPeerID(address, port),
-             })
-             baseAddress += 48+16
-         }
+             let port = Helpers.parseBitPacket(data, 32+32, 16) // get port
+        /*--------------------------- END --------------------------- */
         
         /*----------------------- Image Data ------------------------ */
 
@@ -167,12 +145,12 @@ module.exports = {
         // return data as a hashmap
         return {
             version: version,
-            messageType: messageType, 
-            numberOfPeers: numberOfPeers,
+            messageType: messageType,
+            originHost: address,
+            originPort: port, 
             imageExtension: imageExt,
             imageNameLength: imageNameLength,
             imageName: imageName,
-            senderDHT: senderDHT
         }
     }
 }

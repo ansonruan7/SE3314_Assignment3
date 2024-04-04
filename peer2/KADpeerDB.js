@@ -22,7 +22,7 @@ let peerName = arguments[3]
 const fs = require('fs');
 const path = require('path');
 //Check current directory
-fs.readdir(`./${peerName}`, (err, files) => {
+fs.readdir(`../${peerName}`, (err, files) => {
     if (err) {
         console.log('Error reading directory:', err);
         return;
@@ -72,6 +72,7 @@ if (arguments.length <= 4){
 
     //Image function
     image.on('connection', function(sock) {
+        Singleton.setClient(sock);
         P2PHandler.handleImageJoining(sock); //called for each client joining
     });
 
@@ -86,14 +87,25 @@ if (arguments.length <= 4){
     console.log(`This peer address is ${HOST}:${PORT} located at ${peerName} [${peerID}]`)
 
     peer.on("connection", (socket) => { // handle new connections
+        /*-------------------------- Check whether peer joining -------------------------- */
+    let receivedData = []; // Initialize an empty array to store received data
 
-        P2PHandler.handleClientJoining(socket) // handle client joining (this will create welcome message)
+    // Event handler for incoming data
+    socket.on('data', (data) => {
+        receivedData.push(data); // Append received data to the array
+        P2PHandler.handleIncomingData(data, socket.remotePort, socket.remoteAddress);
+    });
 
-        socket.on('data', (data) => {
-            // handle hello message
-            P2PHandler.handleIncomingData(data, socket.remotePort, socket.remoteAddress)
-            socket.end() // close the port
-        })
+    // Set a timeout to check for received data after a delay
+    setTimeout(() => {
+        if (receivedData.length > 0) {
+            // Data received, handle it
+            let combinedData = Buffer.concat(receivedData); // Combine all received buffers into one
+            P2PHandler.handleIncomingData(combinedData, socket.remotePort, socket.remoteAddress);
+        } else {
+            P2PHandler.handleClientJoining(socket); // handle client joining (this will create a welcome message)
+        }
+    }, 100);
 
         socket.on('error', () => {
 
@@ -161,7 +173,6 @@ if (arguments.length <= 4){
 
         /*----------------------------------- Handle image transfer packet --------------------------------- */
         // Handle message
-        console.log(peer.remoteAddress + ':' + peer.remotePort);
         P2PHandler.handleIncomingData(data, connectionPort, connectionAddress, peer);
         /*----------------------------------- END --------------------------------- */
     })

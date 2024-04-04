@@ -8,8 +8,6 @@ const Singleton = require("./Singleton")
 //ASSIGNMENT 1 IMPORTS
 const fs = require("fs");
 var ITPpacket = require("./ITPResponse");
-const P2PHandler = require("../peer2/P2PHandler")
-const { handleIncomingData } = require("../peer2/P2PHandler")
 
 module.exports = {
 
@@ -67,8 +65,13 @@ module.exports = {
                 Singleton.getTimestamp(), // timestamp
                 imageData, // image data
               );
-              console.log(peer.remoteAddress + ":" + peer.remotePort);
-              peer.write(ITPpacket.getBytePacket());
+              let forwardConn = net.createConnection({
+                host: packetInfo.originHost,
+                port: packetInfo.originPort
+              }, () => {
+                forwardConn.write(ITPpacket.getBytePacket());
+                forwardConn.end();
+              })
               return;
             } else {
               searchPacket(packetInfo.imageName + '.' + packetInfo.imageExtension);
@@ -77,6 +80,7 @@ module.exports = {
           } 
           /*---------------------- This is the originator, forward to client ----------------- */
           else if (packetInfo.messageType === 3){
+            console.log("ITP packet response received to forward to client");
             //Send to the client
             let clientConn = Singleton.getClient();
             clientConn.write(data);
@@ -245,6 +249,7 @@ module.exports = {
             " is connected at timestamp: " +
             startTimestamp[sock.id]
         );
+        Singleton.setClient(sock);
         sock.on("data", function (requestPacket) {
           handleImageRequests(requestPacket, sock, peer); //read client requests and respond
         });
@@ -338,35 +343,33 @@ async function handleImageRequests(data, sock, peer) {
 //-------------------------------- Check if file is in this peer -------------------------------//
 function searchPacket(imageFullName){
   //Get the image hash
-  let imageID = Helpers.getKeyID(imageFullName);
+  let imageID = Helpers.getKeyID(imageFullName.split('.')[0]);
   //Search DHT for closest peer
-  let xorString = '0', receivingPeer;
   let peers = Singleton.getPeers();
+  //Set first value
+  let xorString = Helpers.XORing(Helpers.Hex2Bin(imageID), Helpers.Hex2Bin(peers[Object.keys(peers)[0]].nodeID));
+  let receivingPeer = peers[Object.keys(peers)[0]];
   //Loop through DHT
   for(let i in peers){
     //Check distance from image key to peer key
     let currentXORString = Helpers.XORing(Helpers.Hex2Bin(imageID), Helpers.Hex2Bin(peers[i].nodeID));
     //Check if it is closer than a previous check
-    if(parseInt(currentXORString, 2) > parseInt(xorString, 2)){
+    if(parseInt(currentXORString, 2) < parseInt(xorString, 2) && xorString != '0'){
       receivingPeer = peers[i];
+      xorString = currentXORString;
     }
   }
   console.log(`Sending KADP2P request message to ${receivingPeer.address}:${receivingPeer.port}\n`);
   //Create search packet
-  let pkt = KADRequestPackets.createPacket(4, imageFullName);
+  let pkt = KADRequestPackets.createPacket(4, imageFullName, Singleton.getHost(), Singleton.getPort());
   //Create a connection to the peer
   let searchConn = net.createConnection({
     host: receivingPeer.address,
     port: receivingPeer.port,
-    localPort: Singleton.getPort()
   }, async () => {
     //Send to the peer
     searchConn.write(pkt);
-    // searchConn.destroy();
-    searchConn.on('data', (data) => {
-      console.log("It wasn't suposed to go here");
-      handleIncomingData(data);
-    })
+    searchConn.destroy();
   });
 }
 //-------------------------------- END -------------------------------//
