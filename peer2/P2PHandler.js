@@ -74,7 +74,8 @@ module.exports = {
               })
               return;
             } else {
-              searchPacket(packetInfo.imageName + '.' + packetInfo.imageExtension);
+              //Forward to another peer
+              searchPacket(packetInfo.imageName + '.' + packetInfo.imageExtension, true, data);
               return;
             }
           } 
@@ -339,7 +340,7 @@ async function handleImageRequests(data, sock, peer) {
 }
 
 //-------------------------------- Check if file is in this peer -------------------------------//
-function searchPacket(imageFullName){
+function searchPacket(imageFullName, isForward, data){
   //Get the image hash
   let imageID = Helpers.getKeyID(imageFullName.split('.')[0]);
   //Search DHT for closest peer
@@ -358,8 +359,13 @@ function searchPacket(imageFullName){
     }
   }
   console.log(`Sending KADP2P request message to ${receivingPeer.address}:${receivingPeer.port}\n`);
-  //Create search packet
-  let pkt = KADRequestPackets.createPacket(4, imageFullName, Singleton.getHost(), Singleton.getPort());
+  //Check if forwarding and create search packet
+  let pkt;
+  if(isForward){
+    pkt = data;
+  } else {
+    pkt = KADRequestPackets.createPacket(4, imageFullName, Singleton.getHost(), Singleton.getPort());
+  }
   //Create a connection to the peer
   let searchConn = net.createConnection({
     host: receivingPeer.address,
