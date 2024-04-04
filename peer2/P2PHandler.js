@@ -8,6 +8,8 @@ const Singleton = require("./Singleton")
 //ASSIGNMENT 1 IMPORTS
 const fs = require("fs");
 var ITPpacket = require("./ITPResponse");
+const P2PHandler = require("../peer2/P2PHandler")
+const { handleIncomingData } = require("../peer2/P2PHandler")
 
 module.exports = {
 
@@ -30,19 +32,17 @@ module.exports = {
         Helpers.printDHT(Object.values(Singleton.getPeers())) // print out the DHT
     },
 
-    handleIncomingData: async function(data, PORT, HOST){
+    handleIncomingData: async function(data, PORT, HOST, peer){
         try {
           let packetInfo = KADP2PPackets.parseMessage(data) // parse info
-          let hello = false;
+          let ttsHello = false;
 
           // print hello message based on packetInfo type
           if (packetInfo.messageType === 1){
               console.log(`\nReceived Welcome Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`);
-              hello = true;
-
+              ttsHello = true;
           } else if (packetInfo.messageType === 2){
             console.log(`\nReceived Hello Message from ${packetInfo.senderName} ${Helpers.getPeerID(HOST, PORT)} along with DHT`);
-            hello = true;
           } 
           /*---------------------------------------- Handle search packets ----------------------------------------- */
             else if (packetInfo.messageType === 4){
@@ -56,33 +56,23 @@ module.exports = {
               if(i == imageKey){
                 isFound = true;
                 break;
-                // let pkt = ITPpacket.init(
-                //   9, // version
-                //   3, // forward to originator
-                //   Singleton.getSequenceNumber(), // sequencepeer1/P2PHandler.js number
-                //   Singleton.getTimestamp(), // timestamp
-                //   imageData, // image data
-                // );
-                // //Create a connection with originating peer and send packet
-                // console.log('we got here');
-                // let forwardConn = net.createConnection({
-                //   host: HOST,
-                //   port: PORT,
-                //   localPort: Singleton.getPort()
-                // }, () => {
-                //   forwardConn.write(pkt);
-                //   forwardConn.end();
-                // });
-                //End function
               }
             }
             if(isFound){
               let imageData = fs.readFileSync(packetInfo.imageName + '.' + packetInfo.imageExtension.toLowerCase());
-              console.log("we here?")
-              return [false, imageData];
-            } else if(!hello){
+              ITPpacket.init(
+                9, // version
+                3, // forward to originator
+                Singleton.getSequenceNumber(), // sequencepeer1/P2PHandler.js number
+                Singleton.getTimestamp(), // timestamp
+                imageData, // image data
+              );
+              console.log(peer.remoteAddress + ":" + peer.remotePort);
+              peer.write(ITPpacket.getBytePacket());
+              return;
+            } else {
               searchPacket(packetInfo.imageName + '.' + packetInfo.imageExtension);
-              return [false, null];
+              return;
             }
           } 
           /*---------------------- This is the originator, forward to client ----------------- */
@@ -110,10 +100,16 @@ module.exports = {
           // Send over the current DHT, and the info of the peers
           this.refreshBucket(Singleton.getPeers(), packetInfo.senderDHT)
 
-          return [true, null];
+          if(ttsHello){
+            // send hello packet on current connection
+            let packetToSend = KADP2PPackets.createPacket(2) // get hello packet
+            peer.write(packetToSend) // for the already existing connection
+
+            peer.end()
+          }
 
         } catch (error) {
-          console.log("Error", error);
+          console.log(error);
         }
     },
 
@@ -240,7 +236,7 @@ module.exports = {
 
     },
     /*----------------------------- FROM ASSIGNMENT 1 ------------------------------ */
-    handleImageJoining: function (sock) {
+    handleImageJoining: function (sock, peer) {
         assignImageName(sock, nickNames);
         const chunks = [];
         console.log(
@@ -250,7 +246,7 @@ module.exports = {
             startTimestamp[sock.id]
         );
         sock.on("data", function (requestPacket) {
-          handleImageRequests(requestPacket, sock); //read client requests and respond
+          handleImageRequests(requestPacket, sock, peer); //read client requests and respond
         });
         sock.on("close", function () {
           handleImageLeaving(sock);
@@ -263,7 +259,7 @@ var nickNames = {},
 clientIP = {},
 startTimestamp = {};
 
-async function handleImageRequests(data, sock) {
+async function handleImageRequests(data, sock, peer) {
   console.log("\nITP packet received:");
   printPacketBit(data);
 
@@ -366,7 +362,11 @@ function searchPacket(imageFullName){
   }, async () => {
     //Send to the peer
     searchConn.write(pkt);
-    searchConn.destroy();
+    // searchConn.destroy();
+    searchConn.on('data', (data) => {
+      console.log("It wasn't suposed to go here");
+      handleIncomingData(data);
+    })
   });
 }
 //-------------------------------- END -------------------------------//

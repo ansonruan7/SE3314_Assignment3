@@ -8,24 +8,22 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch Program Client",
+            "name": "peer1",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/KADpeer.js",
-            "args":["n", "test3", "-p","127.0.0.1:4932"]
+            "program": "${workspaceFolder}/peer1/KADpeerDB.js",
+            "args":["n", "peer1"]
         },
-    
-
-    {
-        "type": "node",
-        "request": "launch",
-        "name": "Test",
-        "skipFiles": [
-            "<node_internals>/**"
-        ],
-        "program": "${workspaceFolder}/test.js",
-    
-    }
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "peer2",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/peer2/KADpeerDB.js",
+            "args":["n", "peer2", "-p", "127.0.0.1:2011"]
+        },
 ]
 }
